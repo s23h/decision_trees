@@ -9,6 +9,7 @@
 
 import numpy as np
 import scipy
+import math
 from scipy import stats
 
 class Dataset(object):
@@ -20,8 +21,8 @@ class Dataset(object):
     def read(self, filename):
         with open(filename, 'r') as f:
             n = len(f.readline().split(','))
-        self.features = np.loadtxt(filename, delimiter=',', usecols=(range(0, n-1)), dtype='float')
-        self.labels = np.loadtxt(filename, delimiter=',', usecols=(n-1), dtype='S12')
+        self.features = np.genfromtxt(filename, delimiter=',', usecols=list(range(0, n-1)), dtype='float')
+        self.labels = np.genfromtxt(filename, delimiter=',', usecols=[n-1], dtype=None)
 
     def find_maxmin(self):
         ymaxs = np.max(self.features, axis=0)
@@ -78,7 +79,7 @@ class DecisionTreeClassifier(object):
             return 0
 
         val, cnts = np.unique(y, return_counts = True)
-        probs = cnts / num_lbls
+        probs = cnts.astype(float) / num_lbls
         num_cl = np.count_nonzero(probs)
 
         if  num_cl <= 1:
@@ -87,30 +88,33 @@ class DecisionTreeClassifier(object):
         entropy = 0
 
         for prob in probs:
-            entropy -= prob * log(prob, 2)
+            entropy -= prob * math.log(prob, 2)
 
         return entropy
 
     def optimal_col_split(self, col, y):
+
+
         opt_left_y, opt_right_y = np.array([]), np.array([])
         min_ent = float('inf')
         split_val = -1
 
-        for candidate in np.unique(col):
-
+        for candidate in col:
             left_y, right_y = np.array([]), np.array([])
 
-            for i in range(len(col)):
-                if col[i] < candidate:
-                    np.append(left_y, y[i])
+            for i, val in enumerate(col):
+                if val < candidate:
+                    left_y = np.append(left_y, y[i])
                 else:
-                    np.append(right_y, y[i])
+                    right_y = np.append(right_y, y[i])
 
             split_ent = len(left_y)/len(y) * self.calc_entropy(left_y) + len(right_y)/len(y) * self.calc_entropy(right_y)
+            # print(left_y, right_y)
+            # print(min_ent, split_ent)
 
             if split_ent < min_ent:
                 min_ent = split_ent
-                split_val = candidate
+                split_val = col[cand_idx]
                 opt_left_y = left_y
                 opt_right_y = right_y
 
@@ -123,7 +127,10 @@ class DecisionTreeClassifier(object):
         y_left, y_right = np.array([]), np.array([])
 
         for i in range(len(x.T)):
-            split_ent, split_val, l_y, r_y = self.optimal_col_split(x.T[i], y)
+            if len(x.shape) == 1:
+               split_ent, split_val, l_y, r_y = self.optimal_col_split(np.array([x.T[i]]), y)
+            else:
+                split_ent, split_val, l_y, r_y = self.optimal_col_split(x.T[i], y)
 
             if split_ent < min_ent:
                 min_ent = split_ent
@@ -135,10 +142,14 @@ class DecisionTreeClassifier(object):
         x_left, x_right = np.array([]), np.array([])
 
         for i in range(len(x.T)):
-            if x.T[opt_split_col][i] < opt_split_val:
-                np.append(x_left, x[i])
+            if len(x.shape) == 1:
+                val = x.T[i]
             else:
-                np.append(x_right, x[i])
+                val = x.T[opt_split_col][i]
+            if val < opt_split_val:
+                x_left = np.append(x_left, x[i])
+            else:
+                x_right = np.append(x_right, x[i])
 
         return opt_split_col, opt_split_val, x_left, y_left, x_right, y_right
 
@@ -148,6 +159,7 @@ class DecisionTreeClassifier(object):
             "Training failed. x and y must have the same number of instances."
 
         split_col, split_val, x_l, y_l, x_r, y_r = self.optimal_split(x, y)
+
         self.split_col = split_col
         self.split_val = split_val
 
@@ -155,20 +167,40 @@ class DecisionTreeClassifier(object):
 
         if self.calc_entropy(y_l) == 0 and len(y_l) > 0:
             self.left.prediction = y_l[0]
-        else:
+        elif len(y_l) != 0:
             self.left.train(x_l, y_l)
 
         self.right = DecisionTreeClassifier()
 
         if self.calc_entropy(y_r) == 0 and len(y_r) > 0:
             self.right.prediction = y_r[0]
-        else:
+        elif len(y_r) != 0:
             self.right.train(x_r, y_r)
 
         # set a flag so that we know that the classifier has been trained
         self.is_trained = True
 
         return self
+
+    def predict_rec(self, x):
+
+        if self.prediction == -1:
+            # right_preds = self.right.predict_rec([]) if self.right != None else []
+            # preds = self.left.predict_rec([])  if self.left != None else []
+            # preds = np.append(preds, right_preds)
+            # predictions = np.append(predictions, preds)
+            # return predictions
+            print(self.split_col)
+            print(self.split_val)
+            if x[self.split_col] < self.split_val and self.left:
+                self.left.predict_rec(x)
+            elif self.right:
+                self.right.predict_rec(x)
+
+        else:
+            # predictions = np.append(predictions, self.prediction)
+            # return predictions
+            return self.prediction
 
     def predict(self, x):
         """ Predicts a set of samples using the trained DecisionTreeClassifier.
@@ -192,25 +224,22 @@ class DecisionTreeClassifier(object):
         if not self.is_trained:
             raise Exception("Decision Tree classifier has not yet been trained.")
 
-        # set up empty N-dimensional vector to store predicted labels
-        # feel free to change this if needed
-        predictions = np.zeros((x.shape[0],), dtype=np.object)
+        predictions = []
+        for sample in x:
+            predictions = np.append(predictions, self.predict_rec(sample))
 
-
-        #######################################################################
-        #                 ** TASK 2.2: COMPLETE THIS METHOD **
-        #######################################################################
-
-
-        # remember to change this if you rename the variable
         return predictions
 
 
-        #######################################################################
-        #                 **            UTILITIES           **
-        #######################################################################
-
-
+    def traverse(self):
+        if self.prediction == -1:
+            desc = "Node("
+            desc += self.left.traverse() if self.left else "empty"
+            desc  += ", "
+            desc += self.right.traverse() if self.right else "empty"
+            return desc + ")"
+        else:
+            return str(self.prediction)
 
 def gof(d1_vals, d1_counts, d2_vals, d2_counts):
     o = scipy.array(d2_counts)
@@ -238,6 +267,10 @@ def differ(d1_vals, d1_counts, d2_vals, d2_counts):
         #                 **             MAIN             **
         #######################################################################
 
+
+
+
+
 '''
 d1 = Dataset()
 d1.read("data/train_full.txt")
@@ -256,3 +289,8 @@ ds.read("data/toy.txt")
 
 model = DecisionTreeClassifier()
 model.train(ds.features, ds.labels)
+print(ds.features)
+print(ds.labels)
+print(model.traverse())
+print(model.predict([[5,7,1]]))
+print(model.calc_entropy(["a", "a", "c", "c"]))
