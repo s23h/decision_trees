@@ -35,11 +35,14 @@ class DecisionNode(object):
         self.right = None
         self.prediction = prediction
 
+    def __str__(self):
+        return "Col: {0}, Val {1}".format(self.split_col, self.split_val)
+
 
 class LeafNode(DecisionNode):
 
-    def f():
-        return
+    def __str__(self):
+        return "Prediction: {0}".format(self.prediction)
 
 
 class DecisionTreeClassifier(object):
@@ -64,26 +67,6 @@ class DecisionTreeClassifier(object):
         self.is_trained = False
         self.filename = filename
         self.root = None
-
-    # def calc_entropy(self, y):
-    #     num_lbls = len(y)
-    #
-    #     if num_lbls <= 1:
-    #         return 0
-    #
-    #     val, cnts = np.unique(y, return_counts = True)
-    #     probs = cnts.astype(float) / num_lbls
-    #     num_cl = np.count_nonzero(probs)
-    #
-    #     if  num_cl <= 1:
-    #         return 0
-    #
-    #     entropy = 0
-    #
-    #     for prob in probs:
-    #         entropy -= prob * math.log(prob, 2)
-    #
-    #     return entropy
 
     def calc_probabilities(self, y):
         vals, cnts = np.unique(y, return_counts=True)
@@ -188,10 +171,9 @@ class DecisionTreeClassifier(object):
         def predict_rec(x, node):
             if not node.prediction:
                 if x[node.split_col] < node.split_val and node.left:
-                    pred = predict_rec(x, node.left)
+                    return predict_rec(x, node.left)
                 elif node.right:
-                    pred = predict_rec(x, node.right)
-                return pred
+                    return predict_rec(x, node.right)
             else:
                 return node.prediction
 
@@ -214,38 +196,48 @@ class DecisionTreeClassifier(object):
             self.root = pi.load(f)
         self.is_trained = True
 
-    def traverse(self, curr):
-        if not curr.prediction:
-            desc = "Node("
-            desc += self.traverse(curr.left) if curr.left else "empty"
-            desc  += ", "
-            desc += self.traverse(curr.right) if curr.right else "empty"
-            return desc + ")"
-        else:
-            return str(curr.prediction)
+    def display(self, node=None, prefix=' '):
+        if not node:
+            node = self.root
+        # prefix components:
+        space =  '    '
+        branch = '|   '
+        # pointers:
+        tee =    '+-- '
+        last =   '\'-- '
 
-dst = Dataset()
+        contents = (node.left, node.right)
+        pointers = [tee] * (len(contents) - 1) + [last]
+        for pointer, node in zip(pointers, contents):
+            yield prefix + pointer + node.__str__()
+            if not node.prediction: # extend the prefix and recurse:
+                extension = branch if pointer == tee else space
+                yield from self.display(node, prefix=prefix+extension)
 
-def setup(ds, filename):
+
+def setup(filename):
+    ds = Dataset()
     ds.read(filename)
 
-    model = DecisionTreeClassifier("data/model.pickle")
+    model = DecisionTreeClassifier("data/model_sub.pickle")
     model.train(ds.features, ds.labels)
     model.serialise_model()
 
     return model
 
 if len(sys.argv) == 3 and sys.argv[1] == "train":
-    model = setup(dst, sys.argv[2])
+    model = setup(sys.argv[2])
 else:
-    model = DecisionTreeClassifier("data/model.pickle")
+    model = DecisionTreeClassifier("data/model_sub.pickle")
     model.deserialise_model()
+    for line in model.display():
+        print(line)
     valid = Dataset()
     valid.read("data/validation.txt")
     preds = model.predict(valid.features)
     count = 0
     for i, pred in enumerate(preds):
-        print(pred, valid.labels[i])
+        # print(pred, valid.labels[i])
         if pred == valid.labels[i]:
             count += 1
     print((float(count) / float(len(valid.labels)) * 100))
