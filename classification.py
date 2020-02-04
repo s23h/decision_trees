@@ -197,22 +197,22 @@ class DecisionTreeClassifier(object):
         self.is_trained = True
 
     def display(self, node=None, prefix=' '):
-        if not node:
-            node = self.root
         # prefix components:
-        space =  '    '
-        branch = '|   '
+        space, branch =  '    ', '|   '
         # pointers:
-        tee =    '+-- '
-        last =   '\'-- '
-
-        contents = (node.left, node.right)
-        pointers = [tee] * (len(contents) - 1) + [last]
-        for pointer, node in zip(pointers, contents):
-            yield prefix + pointer + node.__str__()
-            if not node.prediction: # extend the prefix and recurse:
-                extension = branch if pointer == tee else space
-                yield from self.display(node, prefix=prefix+extension)
+        tee, last =    '+-- ', '\'-- '
+        def display_rec(node, prefix=' '):
+            if not node:
+                node = self.root
+            contents = (node.left, node.right)
+            pointers = [tee] * (len(contents) - 1) + [last]
+            for pointer, node in zip(pointers, contents):
+                yield prefix + pointer + node.__str__()
+                if not node.prediction: # extend the prefix and recurse:
+                    extension = branch if pointer == tee else space
+                    yield from display_rec(node, prefix=prefix+extension)
+        for line in display_rec(self.root):
+            print(line)
 
 
 def setup(filename):
@@ -230,8 +230,7 @@ if len(sys.argv) == 3 and sys.argv[1] == "train":
 else:
     model = DecisionTreeClassifier("data/model_sub.pickle")
     model.deserialise_model()
-    for line in model.display():
-        print(line)
+    model.display()
     valid = Dataset()
     valid.read("data/validation.txt")
     preds = model.predict(valid.features)
