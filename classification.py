@@ -178,20 +178,20 @@ class DecisionTreeClassifier(object):
             for each instance in x
         """
 
-        def predict_rec(x, node):
-            if not node.prediction:
-                if x[node.split_col] < node.split_val and node.left:
-                    return predict_rec(x, node.left)
+        def predict_sample(sample):
+            node = self.root
+            while not node.prediction:
+                if sample[node.split_col] < node.split_val and node.left:
+                    node = node.left
                 elif node.right:
-                    return predict_rec(x, node.right)
-            else:
-                return node.prediction
+                    node = node.right
+            return node.prediction
 
         # make sure that classifier has been trained before predicting
         if not self.is_trained:
             raise Exception("Decision Tree classifier has not yet been trained.")
 
-        predictions = [predict_rec(sample, self.root) for sample in x]
+        predictions = [predict_sample(sample) for sample in x]
         return np.asarray(predictions)
 
     def serialise_model(self, filename):
