@@ -4,12 +4,15 @@ import math
 from scipy import stats
 import sys
 import pickle as pi
+from collections import deque
 
 class Dataset(object):
 
-    def __init__(self):
+    def __init__(self, filename=None):
         self.features = None
         self.labels = None
+        if filename:
+            self.read(filename)
 
     def read(self, filename):
         with open(filename, 'r') as f:
@@ -36,7 +39,7 @@ class DecisionNode(object):
         self.left = None
         self.right = None
         self.prediction = prediction
-        self.label = label if label else "Col {0}".format(self.split_col)
+        self.label = label
 
     def __str__(self):
         return "Decision: {0} < {1}".format(self.label, self.split_val)
@@ -99,14 +102,13 @@ class DecisionTreeClassifier(object):
 
         return opt_left, opt_right, opt_val, opt_col_idx
 
-    def split(self, idx, val, x, y=None):
+    def split(self, idx, val, x, data):
         left, right = [], []
-        y_flag = (y is not None)
         for i, item in enumerate(x.T[idx]):
             if item < val:
-                left.append(y[i] if y_flag else x[i])
+                left.append(data[i])
             else:
-                right.append(y[i] if y_flag else x[i])
+                right.append(data[i])
         return np.asarray(left), np.asarray(right)
 
     def train(self, x, y):
@@ -133,13 +135,14 @@ class DecisionTreeClassifier(object):
                 return LeafNode(prediction=y[0])
 
             left_y, right_y, opt_val, opt_col_idx = found_split
-            left_x, right_x = self.split(opt_col_idx, opt_val, x)
+            left_x, right_x = self.split(opt_col_idx, opt_val, x, x)
 
             if self.headers:
                 node = DecisionNode(split_col=opt_col_idx, split_val=opt_val,
                                     label=self.headers[opt_col_idx])
             else:
-                node = DecisionNode(split_col=opt_col_idx, split_val=opt_val)
+                node = DecisionNode(split_col=opt_col_idx, split_val=opt_val,
+                                    label="Col {0}".format(op_col_idx))
 
             node.left = train_rec(left_x, left_y)
             node.right = train_rec(right_x, right_y)
@@ -200,12 +203,15 @@ class DecisionTreeClassifier(object):
             self.root = pi.load(f)
         self.is_trained = True
 
-    def display(self, node=None, prefix=' '):
+    def __str__(self):
+        if not self.is_trained:
+            return "Untrained Model"
+
         space, branch, tee, last =  '    ', '|   ', '+-- ', '\'-- '
 
-        def display_rec(node, prefix=' '):
-            if not node:
-                node = self.root
+        def display_rec(node, prefix=''):
+            if node is self.root:
+                yield node.__str__()
             contents = (node.left, node.right)
             pointers = (tee, last)
             for pointer, node in zip(pointers, contents):
@@ -214,35 +220,31 @@ class DecisionTreeClassifier(object):
                     extension = branch if pointer == tee else space
                     yield from display_rec(node, prefix=prefix+extension)
 
-        for line in display_rec(self.root):
-            print(line)
+        return "\n".join((line for line in display_rec(self.root)))
 
 
-headers = ["x-box", "y-box", "width", "high", "onpix", "x-bar", "y-bar", "x2bar",
-           "y2bar", "xybar", "x2ybr", "xy2br", "x-ege", "xegvy", "y-ege", "yegvx"]
+if __name__ == "__main__":
 
-def setup(filename):
-    ds = Dataset()
-    ds.read(filename)
+    from classification import *
 
-    model = DecisionTreeClassifier(headers)
-    model.train(ds.features, ds.labels)
-    model.serialise_model("data/model_sub.pickle")
+    headers = ["x-box", "y-box", "width", "high", "onpix", "x-bar", "y-bar", "x2bar",
+               "y2bar", "xybar", "x2ybr", "xy2br", "x-ege", "xegvy", "y-ege", "yegvx"]
 
-    return model
-
-if len(sys.argv) == 3 and sys.argv[1] == "train":
-    model = setup(sys.argv[2])
-else:
-    model = DecisionTreeClassifier(headers)
-    model.deserialise_model("data/model_sub.pickle")
-    model.display()
-    valid = Dataset()
-    valid.read("data/validation.txt")
-    preds = model.predict(valid.features)
-    count = 0
-    for i, pred in enumerate(preds):
-        # print(pred, valid.labels[i])
-        if pred == valid.labels[i]:
-            count += 1
-    print((float(count) / float(len(valid.labels)) * 100))
+    if len(sys.argv) == 3 and sys.argv[1] == "train":
+        ds = Dataset(sys.argv[2])
+        model = DecisionTreeClassifier(headers)
+        model.train(ds.features, ds.labels)
+        model.serialise_model("data/model_sub.pickle")
+    else:
+        model = DecisionTreeClassifier(headers)
+        model.deserialise_model("data/model_sub.pickle")
+        print(model)
+        valid = Dataset()
+        valid.read("data/validation.txt")
+        preds = model.predict(valid.features)
+        count = 0
+        for i, pred in enumerate(preds):
+            # print(pred, valid.labels[i])
+            if pred == valid.labels[i]:
+                count += 1
+        print((float(count) / float(len(valid.labels)) * 100))
