@@ -14,8 +14,10 @@ class Dataset(object):
     def read(self, filename):
         with open(filename, 'r') as f:
             n = len(f.readline().split(','))
-        self.features = np.genfromtxt(filename, delimiter=',', usecols=list(range(0, n-1)), dtype='float')
-        self.labels = np.genfromtxt(filename, delimiter=',', usecols=[n-1], dtype=None)
+        self.features = np.genfromtxt(filename, delimiter=',', encoding=None,
+                                      usecols=list(range(0, n-1)), dtype='float')
+        self.labels = np.genfromtxt(filename, delimiter=',', encoding=None,
+                                    usecols=[n-1], dtype=None)
 
     def find_maxmin(self):
         ymaxs = np.max(self.features, axis=0)
@@ -28,15 +30,16 @@ class Dataset(object):
 
 class DecisionNode(object):
 
-    def __init__(self, split_col=None, split_val=None, prediction=None):
+    def __init__(self, split_col=None, split_val=None, prediction=None, label=None):
         self.split_col = split_col
         self.split_val = split_val
         self.left = None
         self.right = None
         self.prediction = prediction
+        self.label = label if label else "Col {0}".format(self.split_col)
 
     def __str__(self):
-        return "Col: {0}, Val {1}".format(self.split_col, self.split_val)
+        return "Decision: {0} < {1}".format(self.label, self.split_val)
 
 
 class LeafNode(DecisionNode):
@@ -63,10 +66,10 @@ class DecisionTreeClassifier(object):
 
     """
 
-    def __init__(self, filename):
+    def __init__(self, headers=None):
         self.is_trained = False
-        self.filename = filename
         self.root = None
+        self.headers = {i: h for i, h in enumerate(headers)} if headers else None
 
     def calc_probabilities(self, y):
         vals, cnts = np.unique(y, return_counts=True)
@@ -125,14 +128,18 @@ class DecisionTreeClassifier(object):
         """
 
         def train_rec(x, y):
-            opt_split = self.find_opt_split(x, y)
-            if not opt_split:
+            found_split = self.find_opt_split(x, y)
+            if not found_split:
                 return LeafNode(prediction=y[0])
 
-            left_y, right_y, opt_val, opt_col_idx = opt_split
+            left_y, right_y, opt_val, opt_col_idx = found_split
             left_x, right_x = self.split(opt_col_idx, opt_val, x)
 
-            node = DecisionNode(opt_col_idx, opt_val)
+            if self.headers:
+                node = DecisionNode(split_col=opt_col_idx, split_val=opt_val,
+                                    label=self.headers[opt_col_idx])
+            else:
+                node = DecisionNode(split_col=opt_col_idx, split_val=opt_val)
 
             node.left = train_rec(left_x, left_y)
             node.right = train_rec(right_x, right_y)
@@ -181,55 +188,54 @@ class DecisionTreeClassifier(object):
         if not self.is_trained:
             raise Exception("Decision Tree classifier has not yet been trained.")
 
-        predictions = []
-        for sample in x:
-            predictions = np.append(predictions, predict_rec(sample, self.root))
+        predictions = [predict_rec(sample, self.root) for sample in x]
+        return np.asarray(predictions)
 
-        return predictions
-
-    def serialise_model(self):
-        with open(self.filename, 'wb') as f:
+    def serialise_model(self, filename):
+        with open(filename, 'wb') as f:
             pi.dump(self.root, f)
 
-    def deserialise_model(self):
-        with open(self.filename, 'rb') as f:
+    def deserialise_model(self, filename):
+        with open(filename, 'rb') as f:
             self.root = pi.load(f)
         self.is_trained = True
 
     def display(self, node=None, prefix=' '):
-        # prefix components:
-        space, branch =  '    ', '|   '
-        # pointers:
-        tee, last =    '+-- ', '\'-- '
+        space, branch, tee, last =  '    ', '|   ', '+-- ', '\'-- '
+
         def display_rec(node, prefix=' '):
             if not node:
                 node = self.root
             contents = (node.left, node.right)
-            pointers = [tee] * (len(contents) - 1) + [last]
+            pointers = (tee, last)
             for pointer, node in zip(pointers, contents):
                 yield prefix + pointer + node.__str__()
                 if not node.prediction: # extend the prefix and recurse:
                     extension = branch if pointer == tee else space
                     yield from display_rec(node, prefix=prefix+extension)
+
         for line in display_rec(self.root):
             print(line)
 
+
+headers = ["x-box", "y-box", "width", "high", "onpix", "x-bar", "y-bar", "x2bar",
+           "y2bar", "xybar", "x2ybr", "xy2br", "x-ege", "xegvy", "y-ege", "yegvx"]
 
 def setup(filename):
     ds = Dataset()
     ds.read(filename)
 
-    model = DecisionTreeClassifier("data/model_sub.pickle")
+    model = DecisionTreeClassifier(headers)
     model.train(ds.features, ds.labels)
-    model.serialise_model()
+    model.serialise_model("data/model_sub.pickle")
 
     return model
 
 if len(sys.argv) == 3 and sys.argv[1] == "train":
     model = setup(sys.argv[2])
 else:
-    model = DecisionTreeClassifier("data/model_sub.pickle")
-    model.deserialise_model()
+    model = DecisionTreeClassifier(headers)
+    model.deserialise_model("data/model_sub.pickle")
     model.display()
     valid = Dataset()
     valid.read("data/validation.txt")
