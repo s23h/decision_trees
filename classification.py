@@ -149,7 +149,7 @@ class DecisionTreeClassifier(object):
                 node = DecisionNode(self.headers[opt_col_idx],
                                     split_col=opt_col_idx, split_val=opt_val)
             else:
-                node = DecisionNode("Col {0}".format(op_col_idx),
+                node = DecisionNode("Col {0}".format(opt_col_idx),
                                     split_col=opt_col_idx, split_val=opt_val)
 
             node.left = train_rec(left_x, left_y)

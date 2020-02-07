@@ -13,7 +13,7 @@
 ##############################################################################
 
 import numpy as np
-
+import classification as cl
 
 class Evaluator(object):
     """ Class to perform evaluation
@@ -183,3 +183,36 @@ class Evaluator(object):
         macro_f = (2 * macro_p * macro_r) / (macro_p + macro_r)
 
         return (f, macro_f)
+
+    def k_split(self, x, y, k):
+        data = np.hstack((x, np.array([y]).T))
+        np.random.shuffle(data)
+        return np.array_split(data, k)
+
+    def k_fold_cv(self, x, y, k):
+        splits = self.k_split(x, y, k)
+        test_set, train_set = np.array([]), np.array([])
+        scores = np.array([])
+        model = cl.DecisionTreeClassifier()
+
+        for idx, fold in enumerate(splits):
+
+            x_test = fold.T[:-1]
+            y_test = fold.T[-1]
+
+
+            for i in range(len(splits)):
+                if i != idx:
+                    if len(train_set) > 0:
+                        train_set = np.vstack((train_set, splits[i]))
+                    else:
+                        train_set = splits[i]
+
+            x_train = train_set.T[:-1]
+            y_train = train_set.T[-1]
+
+            model.train(x_train.T, y_train)
+            conf = self.confusion_matrix(model.predict(x_test.T), y_test)
+            scores = np.append(scores, self.accuracy(conf))
+
+        return np.mean(scores)
