@@ -189,7 +189,14 @@ class Evaluator(object):
         np.random.shuffle(data)
         return np.array_split(data, k)
 
-    def k_fold_cv(self, x, y, k):
+    def k_fold_cv(self, x, y, k, scoring):
+
+        k = len(y) if k > len(y) else k
+
+        if k < 2:
+            print("k must be at least 2 as the minimum number of splits is 2")
+            exit(0)
+
         splits = self.k_split(x, y, k)
         test_set, train_set = np.array([]), np.array([])
         scores = np.array([])
@@ -199,7 +206,6 @@ class Evaluator(object):
 
             x_test = fold.T[:-1]
             y_test = fold.T[-1]
-
 
             for i in range(len(splits)):
                 if i != idx:
@@ -213,6 +219,26 @@ class Evaluator(object):
 
             model.train(x_train.T, y_train)
             conf = self.confusion_matrix(model.predict(x_test.T), y_test)
-            scores = np.append(scores, self.accuracy(conf))
+            avg = None
 
-        return np.mean(scores)
+            if scoring == "accuracy":
+                avg = self.accuracy(conf)
+            elif scoring == "precision":
+                _, avg = self.precision(conf)
+            elif scoring == "recall":
+                _, avg = self.recall(conf)
+            elif scoring == "f1":
+                _, avg = self.f1_score(conf)
+            else:
+                print("Invalid scoring metric. Please enter accuracy, precision, recall or f1")
+                exit(0)
+
+            scores = np.append(scores, avg)
+
+        return np.mean(scores), np.std(scores)
+
+ds = cl.Dataset()
+ds.read("data/toy.txt")
+
+eval = Evaluator()
+print(eval.k_fold_cv(ds.features, ds.labels, 4, "recall"))
