@@ -33,22 +33,26 @@ class Dataset(object):
 
 class DecisionNode(object):
 
-    def __init__(self, split_col=None, split_val=None, prediction=None, label=None):
+    def __init__(self, name, labels=None, counts=None, split_col=None, split_val=None, prediction=None):
         self.split_col = split_col
         self.split_val = split_val
         self.left = None
         self.right = None
         self.prediction = prediction
-        self.label = label
+        self.name = name
+        if labels and counts:
+            self.counts = {l: c for l, c in zip(labels, counts)}
+        else:
+            self.counts = None
 
     def __str__(self):
-        return "Decision: {0} < {1}".format(self.label, self.split_val)
+        return "Decision: {0} < {1}".format(self.name, self.split_val)
 
 
 class LeafNode(DecisionNode):
 
     def __str__(self):
-        return "Prediction: {0}".format(self.prediction)
+        return "Prediction: {0}".format(self.name)
 
 
 class DecisionTreeClassifier(object):
@@ -131,18 +135,22 @@ class DecisionTreeClassifier(object):
 
         def train_rec(x, y):
             found_split = self.find_opt_split(x, y)
+            labels, counts = np.unique(y, return_counts=True)
+            print(type(labels), labels)
+
             if not found_split:
-                return LeafNode(prediction=y[0])
+                return LeafNode(str(y[0]), prediction=y[0],
+                                labels=labels, counts=counts)
 
             left_y, right_y, opt_val, opt_col_idx = found_split
             left_x, right_x = self.split(opt_col_idx, opt_val, x, x)
 
             if self.headers:
-                node = DecisionNode(split_col=opt_col_idx, split_val=opt_val,
-                                    label=self.headers[opt_col_idx])
+                node = DecisionNode(self.headers[opt_col_idx],
+                                    split_col=opt_col_idx, split_val=opt_val)
             else:
-                node = DecisionNode(split_col=opt_col_idx, split_val=opt_val,
-                                    label="Col {0}".format(op_col_idx))
+                node = DecisionNode("Col {0}".format(op_col_idx),
+                                    split_col=opt_col_idx, split_val=opt_val)
 
             node.left = train_rec(left_x, left_y)
             node.right = train_rec(right_x, right_y)
@@ -230,14 +238,14 @@ if __name__ == "__main__":
     headers = ["x-box", "y-box", "width", "high", "onpix", "x-bar", "y-bar", "x2bar",
                "y2bar", "xybar", "x2ybr", "xy2br", "x-ege", "xegvy", "y-ege", "yegvx"]
 
-    if len(sys.argv) == 3 and sys.argv[1] == "train":
+    if len(sys.argv) == 4 and sys.argv[1] == "train":
         ds = Dataset(sys.argv[2])
         model = DecisionTreeClassifier(headers)
         model.train(ds.features, ds.labels)
-        model.serialise_model("data/model_sub.pickle")
-    else:
+        model.serialise_model(sys.argv[3])
+    elif len(sys.argv) == 3 and sys.argv[1] == "predict":
         model = DecisionTreeClassifier(headers)
-        model.deserialise_model("data/model_sub.pickle")
+        model.deserialise_model("data/model.pickle")
         print(model)
         valid = Dataset()
         valid.read("data/validation.txt")
@@ -248,3 +256,6 @@ if __name__ == "__main__":
             if pred == valid.labels[i]:
                 count += 1
         print((float(count) / float(len(valid.labels)) * 100))
+    else:
+        s = "Arguments in wrong form"
+        raise Exception(s)

@@ -4,26 +4,24 @@ from eval import Evaluator
 
 class DecisionTreePruner(object):
 
-    def __init__(self, tree, labels, counts, valid_features, valid_labels):
+    def __init__(self, tree, valid):
         self.tree = tree
-        self.label_count = {l: c for l, c in zip(labels, counts)}
-        self.valid_features = valid_features
-        self.valid_labels = valid_labels
+        self.valid = valid
         self.eval = Evaluator()
 
     def _prune_children(self, node):
         left_pred, right_pred = node.left.prediction, node.right.prediction
-        left_count = self.label_count[left_pred]
-        right_count = self.label_count[right_pred]
+        left_count = node.left.counts[left_pred]
+        right_count = node.right.counts[right_pred]
 
         if left_count > right_count:
-            node.left = node.right = LeafNode(prediction=left_pred)
+            node.right = node.left
         else:
-            node.left = node.right = LeafNode(prediction=right_pred)
+            node.left = node.right
 
     def _get_accuracy(self):
-        preds = self.tree.predict(self.valid_features)
-        confusion = self.eval.confusion_matrix(preds, self.valid_labels)
+        preds = self.tree.predict(valid.features)
+        confusion = self.eval.confusion_matrix(preds, valid.labels)
         accuracy = self.eval.accuracy(confusion)
 
         return accuracy
@@ -54,15 +52,16 @@ class DecisionTreePruner(object):
             for node in prunable_nodes:
                 self._prune_children(node)
                 pruned_accuracy = self._get_accuracy()
-
+                print("Pruned:", node, "with children:", node.left, node.right, "new accuracy:", pruned_accuracy)
                 if pruned_accuracy > max_pruned_accuracy:
                     max_pruned_accuracy = pruned_accuracy
                     best_node = node
 
                 self.tree.deserialise_model("pruned_model.pickle")
 
-            improved = max_pruned_accuracy > unpruned_accuracy
+            improved = max_pruned_accuracy >= unpruned_accuracy
             if improved:
+                print("PRUNED")
                 self._prune_children(best_node)
                 self.tree.serialise_model("pruned_model.pickle")
 
@@ -72,11 +71,19 @@ if __name__ == "__main__":
                "y2bar", "xybar", "x2ybr", "xy2br", "x-ege", "xegvy", "y-ege", "yegvx"]
 
     valid = Dataset("data/validation.txt")
-    train = Dataset("data/train_sub.txt")
+    test = Dataset("data/test.txt")
 
-    labels, counts = train.label_distribution()
     model = DecisionTreeClassifier(headers)
-    model.deserialise_model("data/model_sub.pickle")
+    model.deserialise_model("data/model.pickle")
 
-    pruner = DecisionTreePruner(model, labels, counts, valid.features, valid.labels)
+    pruner = DecisionTreePruner(model, valid)
     pruner.prune_tree()
+    print(pruner.tree)
+    preds = pruner.tree.predict(valid.features)
+    count = 0
+    for i, pred in enumerate(preds):
+        # print(pred, valid.labels[i])
+        if pred == valid.labels[i]:
+            count += 1
+    acc = float(count) / float(len(valid.labels)) * 100
+    print("ACCURACY = ", acc)
