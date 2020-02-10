@@ -30,6 +30,30 @@ class Dataset(object):
     def label_distribution(self):
         return np.unique(self.labels, return_counts=True)
 
+    def gof(self, other):
+        d1_vals, d1_counts = self.label_distribution()
+        d2_vals, d2_counts = other.label_distribution()
+        o = scipy.array(d2_counts)
+        o_sum = sum(d2_counts)
+        e = scipy.array(d1_counts)
+        e_sum = sum(d1_counts)
+
+        for i, exp in enumerate(e):
+            e[i] = (exp / e_sum) * o_sum
+
+        print(scipy.stats.chisquare(o, f_exp=e))
+
+    def differ(self, other):
+        d1_vals, d1_counts = self.label_distribution()
+        d2_vals, d2_counts = other.label_distribution()
+        d2_map = {val.decode("utf-8"): count for val, count in zip(d2_vals, d2_counts)}
+        res = []
+
+        for val, count in zip(d1_vals, d1_counts):
+            val = val.decode("utf-8")
+            res.append((val, count, d2_map[val], (count - d2_map[val])*100 / count))
+
+        print(res)
 
 class DecisionNode(object):
 
