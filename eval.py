@@ -199,11 +199,14 @@ class Evaluator(object):
             exit(0)
 
         splits = self.k_split(x, y, k)
-        test_set, train_set = np.array([]), np.array([])
         scores = np.array([])
-        model = cl.DecisionTreeClassifier()
+        top_eval = 0
+        top_model = None
+
 
         for idx, fold in enumerate(splits):
+
+            test_set, train_set = np.array([]), np.array([])
 
             x_test = fold.T[:-1]
             y_test = fold.T[-1]
@@ -218,6 +221,8 @@ class Evaluator(object):
             x_train = train_set.T[:-1]
             y_train = train_set.T[-1]
 
+
+            model = cl.DecisionTreeClassifier()
             model.train(x_train.T, y_train)
             conf = self.confusion_matrix(model.predict(x_test.T), y_test)
             avg = None
@@ -234,9 +239,13 @@ class Evaluator(object):
                 print("Invalid scoring metric. Please enter accuracy, precision, recall or f1")
                 exit(0)
 
-            scores = np.append(scores, avg)
+            if top_eval < avg:
+                top_eval = avg
+                top_nodel = model
 
-        return np.mean(scores), np.std(scores)
+            scores = np.append(scores, avg)
+            
+        return np.mean(scores), np.std(scores), top_model
 
 if __name__ == "__main__":
     # ds = cl.Dataset()
