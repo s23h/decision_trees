@@ -233,6 +233,26 @@ class DecisionTreeClassifier(object):
 
         return "\n".join((line for line in display_rec(self.root)))
 
+def display(model):
+    if not model.is_trained:
+        return "Untrained Model"
+
+    space, branch, tee, last =  '    ', '|   ', '+-- ', '\'-- '
+
+    def display_rec(node, prefix='', depth=1):
+        if node is model.root:
+            yield node.__str__()
+        contents = (node.left, node.right)
+        pointers = (tee, last)
+        if depth <= 10:
+            for pointer, node in zip(pointers, contents):
+                yield prefix + pointer + node.__str__()
+                if not node.prediction: # extend the prefix and recurse:
+                    extension = branch if pointer == tee else space
+                    yield from display_rec(node, prefix=prefix+extension, depth=depth+1)
+
+    return "\n".join((line for line in display_rec(model.root)))
+
 
 if __name__ == "__main__":
 
@@ -249,7 +269,7 @@ if __name__ == "__main__":
     elif len(sys.argv) == 3 and sys.argv[1] == "predict":
         model = DecisionTreeClassifier(headers)
         model.deserialise_model(sys.argv[2])
-        print(model)
+        print(display(model))
         valid = Dataset()
         valid.read("data/validation.txt")
         # preds = model.predict(valid.features)

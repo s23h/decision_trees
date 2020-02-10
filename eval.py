@@ -45,6 +45,7 @@ class Evaluator(object):
 
         if not class_labels:
             class_labels = np.unique(annotation)
+        print(class_labels)
         class_map = {cl: i for i, cl in enumerate(class_labels)}
 
         confusion = np.zeros((len(class_labels), len(class_labels)), dtype=np.int)
@@ -238,8 +239,25 @@ class Evaluator(object):
         return np.mean(scores), np.std(scores)
 
 if __name__ == "__main__":
-    ds = cl.Dataset()
-    ds.read("data/toy.txt")
-
+    # ds = cl.Dataset()
+    # ds.read("data/toy.txt")
+    #
+    # eval = Evaluator()
+    # print(eval.k_fold_cv(ds.features, ds.labels, 4, "recall"))
     eval = Evaluator()
-    print(eval.k_fold_cv(ds.features, ds.labels, 4, "recall"))
+    pickles = ["data/model_full.pickle", "data/model_noisy.pickle", "data/model_sub.pickle"]
+    models = [cl.DecisionTreeClassifier(), cl.DecisionTreeClassifier(), cl.DecisionTreeClassifier()]
+    test = cl.Dataset("data/test.txt")
+    model, pickle = models[2], pickles[2]
+    model.deserialise_model(pickle)
+    preds = model.predict(test.features)
+    confusion = eval.confusion_matrix(preds, test.labels)
+    print(confusion)
+    print()
+    print(eval.accuracy(confusion))
+    print()
+    print(eval.precision(confusion))
+    print()
+    print(eval.recall(confusion))
+    print()
+    print(eval.f1_score(confusion))
