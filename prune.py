@@ -39,29 +39,45 @@ class DecisionTreePruner(object):
         def prunable(node):
             return type(node.left) is LeafNode and type(node.right) is LeafNode
 
-        queue = deque([self.tree.root])
+        queue = deque([(self.tree.root, 1)])
         prunable_nodes = []
         while queue:
-            node = queue.popleft()
+            node, depth = queue.popleft()
             if type(node) is not LeafNode:
                 for i, child in enumerate([node.left, node.right]):
                     if prunable(child):
                         direction = 'L' if i == 0 else 'R'
-                        prunable_nodes.append((node, child, direction))
+                        prunable_nodes.append((node, child, direction, depth))
                     else:
-                        queue.append(child)
+                        queue.append((child, depth + 1))
         return prunable_nodes
+
+    def max_depth(self):
+        queue = deque([(self.tree.root, 0)])
+        max_depth = 0
+
+        while queue:
+            node, depth = queue.popleft()
+            max_depth = max(max_depth, depth)
+            if type(node) is not LeafNode:
+                queue.append((node.left, depth + 1))
+                queue.append((node.right, depth + 1))
+
+        return max_depth
+
 
     def prune_tree(self):
         unpruned_accuracy = self._get_accuracy()
+        print(unpruned_accuracy)
         improved = True
 
         while improved:
             max_pruned_accuracy = 0
             prunable_nodes = self._find_prunable_nodes()
+            prunable_nodes.sort(key=lambda n: n[3])
             best = None
 
-            for parent, node, direction in prunable_nodes:
+            for parent, node, direction, depth in prunable_nodes:
                 self._prune_children(parent, node, direction)
                 pruned_accuracy = self._get_accuracy()
 
@@ -75,20 +91,16 @@ class DecisionTreePruner(object):
 
             if improved:
                 parent, best_node, direction = best
-                # print(unpruned_accuracy, max_pruned_accuracy)
+                print(max_pruned_accuracy)
                 unpruned_accuracy = max_pruned_accuracy
 
-                # print("Pruning node:", best_node, "with children", best_node.left, best_node.right)
-                # print("")
-                print("pruned")
-
                 self._prune_children(parent, best_node, direction)
-
-                # print(self.tree)
 
 def setup(model, valid, test):
     pruner = DecisionTreePruner(model, valid)
     old = str(pruner.tree)
+
+    old_depth = pruner.max_depth()
 
     preds = pruner.tree.predict(test.features)
     confusion = eval.confusion_matrix(preds, test.labels)
@@ -100,9 +112,9 @@ def setup(model, valid, test):
     confusion = eval.confusion_matrix(preds, test.labels)
     new_accuracy = eval.accuracy(confusion)
 
-    print(old == str(pruner.tree))
+    new_depth = pruner.max_depth()
 
-    return old_accuracy, new_accuracy
+    return old_accuracy, new_accuracy, old_depth, new_depth
 
 
 if __name__ == "__main__":
@@ -114,10 +126,11 @@ if __name__ == "__main__":
     eval = Evaluator()
 
     full_model = DecisionTreeClassifier(headers)
-    full_model.deserialise_model("data/model.pickle")
+    full_model.deserialise_model("data/model_full.pickle")
 
     noisy_model = DecisionTreeClassifier(headers)
     noisy_model.deserialise_model("data/model_noisy.pickle")
 
     print(setup(full_model, valid, test))
+    print()
     print(setup(noisy_model, valid, test))
