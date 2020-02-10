@@ -40,7 +40,7 @@ class DecisionNode(object):
         self.right = None
         self.prediction = prediction
         self.name = name
-        if labels and counts:
+        if labels is not None and counts is not None:
             self.counts = {l: c for l, c in zip(labels, counts)}
         else:
             self.counts = None
@@ -139,18 +139,19 @@ class DecisionTreeClassifier(object):
             print(type(labels), labels)
 
             if not found_split:
-                return LeafNode(str(y[0]), prediction=y[0],
-                                labels=labels, counts=counts)
+                return LeafNode(str(y[0]), prediction=y[0])
 
             left_y, right_y, opt_val, opt_col_idx = found_split
             left_x, right_x = self.split(opt_col_idx, opt_val, x, x)
 
             if self.headers:
                 node = DecisionNode(self.headers[opt_col_idx],
-                                    split_col=opt_col_idx, split_val=opt_val)
+                                    split_col=opt_col_idx, split_val=opt_val,
+                                    labels=labels, counts=counts)
             else:
                 node = DecisionNode("Col {0}".format(opt_col_idx),
-                                    split_col=opt_col_idx, split_val=opt_val)
+                                    split_col=opt_col_idx, split_val=opt_val,
+                                    labels=labels, counts=counts)
 
             node.left = train_rec(left_x, left_y)
             node.right = train_rec(right_x, right_y)
@@ -245,7 +246,7 @@ if __name__ == "__main__":
         model.serialise_model(sys.argv[3])
     elif len(sys.argv) == 3 and sys.argv[1] == "predict":
         model = DecisionTreeClassifier(headers)
-        model.deserialise_model("data/model.pickle")
+        model.deserialise_model(sys.argv[2])
         print(model)
         valid = Dataset()
         valid.read("data/validation.txt")
