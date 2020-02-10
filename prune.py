@@ -76,7 +76,7 @@ class DecisionTreePruner(object):
 
             if improved:
                 parent, best_node, direction = best
-                print(unpruned_accuracy, max_pruned_accuracy)
+                # print(unpruned_accuracy, max_pruned_accuracy)
                 unpruned_accuracy = max_pruned_accuracy
 
                 # print("Pruning node:", best_node, "with children", best_node.left, best_node.right)
@@ -87,6 +87,24 @@ class DecisionTreePruner(object):
 
                 # print(self.tree)
 
+def setup(model, valid, test):
+    pruner = DecisionTreePruner(model, valid)
+    old = str(pruner.tree)
+
+    preds = pruner.tree.predict(test.features)
+    confusion = eval.confusion_matrix(preds, test.labels)
+    old_accuracy = eval.accuracy(confusion)
+
+    pruner.prune_tree()
+
+    preds = pruner.tree.predict(test.features)
+    confusion = eval.confusion_matrix(preds, test.labels)
+    new_accuracy = eval.accuracy(confusion)
+
+    print(old == str(pruner.tree))
+
+    return old_accuracy, new_accuracy
+
 
 if __name__ == "__main__":
     headers = ["x-box", "y-box", "width", "high", "onpix", "x-bar", "y-bar", "x2bar",
@@ -96,24 +114,14 @@ if __name__ == "__main__":
     test = Dataset("data/test.txt")
     eval = Evaluator()
 
-    model = DecisionTreeClassifier(headers)
-    model.deserialise_model("data/model.pickle")
+    full_model = DecisionTreeClassifier(headers)
+    full_model.deserialise_model("data/model.pickle")
 
-    pruner = DecisionTreePruner(model, valid)
+    noisy_model = DecisionTreeClassifier(headers)
+    noisy_model.deserialise_model("data/model_noisy.pickle")
 
-    preds = pruner.tree.predict(test.features)
-    confusion = eval.confusion_matrix(preds, test.labels)
-    accuracy = eval.accuracy(confusion)
-
-    print("OLD ACCURACY =", accuracy)
-
-    pruner.prune_tree()
-
-    preds = pruner.tree.predict(test.features)
-    confusion = eval.confusion_matrix(preds, test.labels)
-    accuracy = eval.accuracy(confusion)
-    print("NEW ACCURACY =", accuracy)
-
+    print(setup(full_model, valid, test))
+    print(setup(noisy_model, valid, test))
     # count = 0
     # for i, pred in enumerate(preds):
     #     # print(pred, valid.labels[i])

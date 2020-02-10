@@ -136,7 +136,6 @@ class DecisionTreeClassifier(object):
         def train_rec(x, y):
             found_split = self.find_opt_split(x, y)
             labels, counts = np.unique(y, return_counts=True)
-            print(type(labels), labels)
 
             if not found_split:
                 return LeafNode(str(y[0]), prediction=y[0])
