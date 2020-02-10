@@ -46,13 +46,13 @@ class DecisionNode(object):
             self.counts = None
 
     def __str__(self):
-        return "Decision: {0} < {1}".format(self.name, self.split_val)
+        return self.name
 
 
 class LeafNode(DecisionNode):
 
     def __str__(self):
-        return "Prediction: {0}".format(self.name)
+        return self.name
 
 
 class DecisionTreeClassifier(object):
@@ -104,7 +104,7 @@ class DecisionTreeClassifier(object):
                     opt_val, opt_col_idx = val, i
                     opt_left, opt_right = left_y, right_y
 
-        return opt_left, opt_right, opt_val, opt_col_idx
+        return opt_left, opt_right, opt_val, opt_col_idx, min_ent
 
     def split(self, idx, val, x, data):
         left, right = [], []
@@ -136,17 +136,20 @@ class DecisionTreeClassifier(object):
         def train_rec(x, y):
             found_split = self.find_opt_split(x, y)
             labels, counts = np.unique(y, return_counts=True)
+            class_distr = {l: c for l, c in zip(labels, counts)}
 
             if not found_split:
-                return LeafNode(str(y[0]), prediction=y[0])
+                name = "Prediction: {0}".format(str(y[0]))
+                return LeafNode(name, prediction=y[0])
 
-            left_y, right_y, opt_val, opt_col_idx = found_split
+            left_y, right_y, opt_val, opt_col_idx, min_ent = found_split
             left_x, right_x = self.split(opt_col_idx, opt_val, x, x)
 
             if self.headers:
-                node = DecisionNode(self.headers[opt_col_idx],
-                                    split_col=opt_col_idx, split_val=opt_val,
-                                    labels=labels, counts=counts)
+                name = "Decision: {0} < {1} - entropy: {2} - class distr: {3}".format(
+                    self.headers[opt_col_idx], opt_val, min_ent, class_distr)
+                node = DecisionNode(name, split_col=opt_col_idx, split_val=opt_val,
+                                    labels=labels, counts=class_distr)
             else:
                 node = DecisionNode("Col {0}".format(opt_col_idx),
                                     split_col=opt_col_idx, split_val=opt_val,
@@ -249,13 +252,13 @@ if __name__ == "__main__":
         print(model)
         valid = Dataset()
         valid.read("data/validation.txt")
-        preds = model.predict(valid.features)
-        count = 0
-        for i, pred in enumerate(preds):
-            # print(pred, valid.labels[i])
-            if pred == valid.labels[i]:
-                count += 1
-        print((float(count) / float(len(valid.labels)) * 100))
+        # preds = model.predict(valid.features)
+        # count = 0
+        # for i, pred in enumerate(preds):
+        #     # print(pred, valid.labels[i])
+        #     if pred == valid.labels[i]:
+        #         count += 1
+        # print((float(count) / float(len(valid.labels)) * 100))
     else:
         s = "Arguments in wrong form"
         raise Exception(s)

@@ -54,7 +54,6 @@ class DecisionTreePruner(object):
 
     def prune_tree(self):
         unpruned_accuracy = self._get_accuracy()
-        # self.tree.serialise_model("pruned_model.pickle")
         improved = True
 
         while improved:
@@ -122,10 +121,3 @@ if __name__ == "__main__":
 
     print(setup(full_model, valid, test))
     print(setup(noisy_model, valid, test))
-    # count = 0
-    # for i, pred in enumerate(preds):
-    #     # print(pred, valid.labels[i])
-    #     if pred == valid.labels[i]:
-    #         count += 1
-    # acc = float(count) / float(len(valid.labels)) * 100
-    # print("ACCURACY = ", acc)
