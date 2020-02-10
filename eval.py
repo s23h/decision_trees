@@ -237,8 +237,9 @@ class Evaluator(object):
 
         return np.mean(scores), np.std(scores)
 
-ds = cl.Dataset()
-ds.read("data/toy.txt")
+if __name__ == "__main__":
+    ds = cl.Dataset()
+    ds.read("data/toy.txt")
 
-eval = Evaluator()
-print(eval.k_fold_cv(ds.features, ds.labels, 4, "recall"))
+    eval = Evaluator()
+    print(eval.k_fold_cv(ds.features, ds.labels, 4, "recall"))
